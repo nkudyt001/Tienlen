@@ -229,8 +229,8 @@ body {
 }
 
 @keyframes zoom-in {
-    from { transform: scale(1); }
-    to { transform: scale(1.2); }
+    from { transform: translate(-50%, -50%) scale(1); }
+    to { transform: translate(-50%, -50%) scale(1.2); }
 }
 
 .center-btn {
@@ -326,6 +326,10 @@ body {
 .card.selected { transform: translateY(-40px); }
 .card.dragging { opacity: 0.8; border: 2px solid var(--accent-blue) !important; box-shadow: 0 0 15px var(--accent-blue); }
 
+.hand-container .card:hover { 
+    box-shadow: inset 0 0 0 3px var(--accent-blue), inset 0 0 15px var(--accent-blue), var(--shadow); 
+}
+
 .card-back { background: radial-gradient(circle, #1a4b8c 0%, #0d1117 100%); border: 3px solid #fff; }
 .card-back::after { content: "TL"; color: rgba(255,255,255,0.2); font-weight: 900; font-size: 2rem; }
 
@@ -369,11 +373,30 @@ body {
 }
 
 .played-cards-area .card {
-    margin-left: -50px !important;
+    margin-left: -50px;
     box-shadow: 0 5px 15px rgba(0,0,0,0.5);
     transition: transform 0.3s ease;
 }
 
 .played-cards-area .card:first-child {
-    margin-left: 0 !important;
+    margin-left: 0;
+}
+
+/* Pair Groups (đôi thông display) */
+.pair-group {
+    display: flex;
+    flex-direction: row;
+    margin-right: 12px;
+}
+
+.pair-group:last-child {
+    margin-right: 0;
+}
+
+.pair-group .card {
+    margin-left: 0;
+}
+
+.pair-group .card:nth-child(2) {
+    margin-left: -40px;
 }

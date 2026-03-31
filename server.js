@@ -209,7 +209,12 @@ function executeMove(room, slotIdx, cards) {
     });
 
     if (player.hand.length === 0) {
-        setTimeout(() => endGame(room, slotIdx), 600);
+        const hasTwo = cards.some(c => c.rankIndex === 12); // Quân 2
+        if (hasTwo) {
+            setTimeout(() => endGame(room, slotIdx, true), 600);
+        } else {
+            setTimeout(() => endGame(room, slotIdx, false), 600);
+        }
     } else {
         setTimeout(() => nextTurn(room), 800);
     }
@@ -267,16 +272,39 @@ function onTimeout(room) {
     handlePass(room, room.currentTurn);
 }
 
-function endGame(room, winnerSlot) {
+function endGame(room, slotIdx, isLoser = false) {
     room.gameState = 'ENDED'; room.isStarted = false;
     stopPlayerTimer(room);
-    emitToRoom(room, 'game-ended', { winnerSlot, winnerName: room.players[winnerSlot]?.name });
+    
+    let winnerSlot = slotIdx;
+    let loserSlot = -1;
+    
+    if (isLoser) {
+        loserSlot = slotIdx;
+        winnerSlot = -1;
+        let minCards = 99;
+        for (let i = 0; i < 4; i++) {
+            if (i === slotIdx) continue;
+            const p = room.players[i];
+            if (p && p.hand && p.hand.length < minCards) {
+                minCards = p.hand.length;
+                winnerSlot = i;
+            }
+        }
+    }
+
+    emitToRoom(room, 'game-ended', { 
+        winnerSlot: winnerSlot, 
+        winnerName: winnerSlot !== -1 ? room.players[winnerSlot]?.name : null,
+        loserSlot: loserSlot,
+        loserName: loserSlot !== -1 ? room.players[loserSlot]?.name : null
+    });
 
     setTimeout(() => {
         room.gameState = 'WAITING';
         room.players.forEach(p => { if (p) { p.isReady = !!p.isAI; p.hand = []; } });
         room.lastPlayedCards = []; room.lastPlayerToPlay = -1; room.passedPlayers.clear();
-        room.firstSlot = winnerSlot; // Người thắng đánh trước ván sau
+        room.firstSlot = winnerSlot !== -1 ? winnerSlot : slotIdx; // Người thắng đánh trước phần sau
         sendRoomState(room);
         broadcastRoomList();
     }, 3000);

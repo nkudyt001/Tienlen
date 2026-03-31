@@ -139,6 +139,9 @@ class GameClient {
             const cards = data.cards.map(cardFromData);
             if (data.players) this.players = data.players;
 
+            // Hiệu ứng bay bài (Lấy tọa độ trước khi xoá khỏi DOM)
+            this.animateCardsToBoard(data.slotIdx, cards);
+
             // Nếu là bài của mình, xóa khỏi tay
             if (data.slotIdx === this.mySlot) {
                 const ids = cards.map(c => c.id);
@@ -146,9 +149,6 @@ class GameClient {
                 ids.forEach(id => this.selectedCardIds.delete(id));
                 this.renderPlayerHand();
             }
-
-            // Hiệu ứng bay bài
-            this.animateCardsToBoard(data.slotIdx, cards);
         });
 
         this.socket.on('player-passed', (data) => {
@@ -171,9 +171,27 @@ class GameClient {
             this.mainTimer.parentElement.classList.add('hidden');
 
             if (this.winnerEl) {
-                this.winnerEl.innerText = data.winnerSlot === this.mySlot ? 'BẠN ĐÃ THẮNG!' : `${data.winnerName.toUpperCase()} THẮNG!`;
+                if (data.loserSlot !== undefined && data.loserSlot !== -1) {
+                    if (data.loserSlot === this.mySlot) {
+                        this.winnerEl.innerText = 'BẠN BỊ XỬ THUA (THỐI 2)!';
+                        this.winnerEl.style.color = '#ff4d4d';
+                        this.winnerEl.style.textShadow = '0 0 50px #ff4d4d, 0 0 10px #000';
+                    } else if (data.winnerSlot === this.mySlot) {
+                        this.winnerEl.innerText = `BẠN THẮNG (${data.loserName.toUpperCase()} THỐI 2)!`;
+                        this.winnerEl.style.color = 'var(--accent-gold)';
+                        this.winnerEl.style.textShadow = '0 0 50px var(--accent-gold), 0 0 10px #000';
+                    } else {
+                        this.winnerEl.innerText = `${data.loserName.toUpperCase()} BỊ XỬ THUA (THỐI 2)!`;
+                        this.winnerEl.style.color = '#ff4d4d';
+                        this.winnerEl.style.textShadow = '0 0 50px #ff4d4d, 0 0 10px #000';
+                    }
+                } else {
+                    this.winnerEl.innerText = data.winnerSlot === this.mySlot ? 'BẠN ĐÃ THẮNG!' : `${data.winnerName.toUpperCase()} THẮNG!`;
+                    this.winnerEl.style.color = 'var(--accent-gold)';
+                    this.winnerEl.style.textShadow = '0 0 50px var(--accent-gold), 0 0 10px #000';
+                }
                 this.winnerEl.classList.remove('hidden');
-                setTimeout(() => this.winnerEl.classList.add('hidden'), 3000);
+                setTimeout(() => this.winnerEl.classList.add('hidden'), 3500);
             }
         });
 
@@ -332,7 +350,7 @@ class GameClient {
             el.style.zIndex = index + 1;
             if (this.selectedCardIds.has(card.id)) el.classList.add('selected');
             el.onclick = () => {
-                if (this.gameState !== 'PLAYING' || this.currentTurn !== this.mySlot) return;
+                if (this.gameState !== 'PLAYING') return;
                 if (el.classList.toggle('selected')) this.selectedCardIds.add(card.id);
                 else this.selectedCardIds.delete(card.id);
                 this.updateControls();
@@ -429,8 +447,22 @@ class GameClient {
         const animPromises = cards.map((card, i) => {
             const animCard = card.render();
             animCard.classList.add('card-animation');
-            animCard.style.left = `${startRect.left + startRect.width / 2 - 45}px`;
-            animCard.style.top = `${startRect.top}px`;
+            animCard.style.margin = '0'; // Fix margin offset
+
+            let startX = startRect.left + startRect.width / 2 - 45;
+            let startY = startRect.top;
+
+            if (serverSlot === this.mySlot) {
+                const domCard = this.playerHandEl.querySelector(`[data-id="${card.id}"]`);
+                if (domCard) {
+                    const rect = domCard.getBoundingClientRect();
+                    startX = rect.left;
+                    startY = rect.top;
+                }
+            }
+
+            animCard.style.left = `${startX}px`;
+            animCard.style.top = `${startY}px`;
             animCard.style.zIndex = 1000 + i;
             document.body.appendChild(animCard);
 
@@ -445,12 +477,37 @@ class GameClient {
 
         Promise.all(animPromises).then(() => {
             this.boardEl.innerHTML = '';
-            cards.forEach((card, i) => {
-                const el = card.render();
-                el.style.marginLeft = i === 0 ? '0' : '-30px';
-                el.style.transform = `rotate(${Math.random() * 10 - 5}deg)`;
-                this.boardEl.appendChild(el);
-            });
+            const sorted = [...cards].sort((a, b) => a.absoluteValue - b.absoluteValue);
+            const combo = classify(sorted);
+
+            if (combo.type === TYPE.THREE_PAIRS_LINK || combo.type === TYPE.FOUR_PAIRS_LINK) {
+                // Đôi thông: hiển thị từng đôi thành nhóm, cách nhau
+                for (let i = 0; i < sorted.length; i += 2) {
+                    const pairGroup = document.createElement('div');
+                    pairGroup.className = 'pair-group';
+                    for (let j = i; j < i + 2 && j < sorted.length; j++) {
+                        const el = sorted[j].render();
+                        el.style.marginLeft = j === i ? '0' : '-40px';
+                        pairGroup.appendChild(el);
+                    }
+                    this.boardEl.appendChild(pairGroup);
+                }
+            } else if (combo.type === TYPE.SEQUENCE) {
+                // Sảnh: xếp ngang gọn gàng, overlap vừa phải
+                sorted.forEach((card, i) => {
+                    const el = card.render();
+                    el.style.marginLeft = i === 0 ? '0' : '-50px';
+                    this.boardEl.appendChild(el);
+                });
+            } else {
+                // Rác, đôi, sám, tứ quý: giữ nguyên kiểu cũ
+                cards.forEach((card, i) => {
+                    const el = card.render();
+                    el.style.marginLeft = i === 0 ? '0' : '-30px';
+                    el.style.transform = `rotate(${Math.random() * 10 - 5}deg)`;
+                    this.boardEl.appendChild(el);
+                });
+            }
             this.renderRoomSlots();
         });
     }

@@ -302,8 +302,26 @@ export class AIPlayer {
 
         // === TRƯỜNG HỢP ĐẶC BIỆT: Còn ít bài ===
 
-        // Nếu còn 1 bài → Đánh luôn
+        // Nếu còn 1 bài → Đánh luôn (nếu là Heo thì đành chịu rủi ro thối)
         if (this.hand.length === 1) return [this.hand[0]];
+        
+        // === LUẬT MỚI: Tránh kết thúc bằng quân 2 (thối 2) ===
+        const hasTwo = sorted.some(c => c.rankIndex === 12);
+        if (hasTwo) {
+            // Tách các quân 2
+            const twos = sorted.filter(c => c.rankIndex === 12);
+            const nonTwos = sorted.filter(c => c.rankIndex !== 12);
+            // Nếu phần bài KHÔNG phải quân 2 chỉ tạo thành ĐÚNG 1 combo hợp lệ (tức là có thể về nhất ở lượt sau)
+            if (nonTwos.length > 0) {
+                const typeLeft = classify(nonTwos).type;
+                if (typeLeft !== TYPE.INVALID) {
+                    // PHẢI xả quân 2 (hoặc đôi 2/sám 2/tứ 2) trước để để dành combo cuối cùng về nhất
+                    if (twos.length === 1) return [twos[0]];
+                    else if (twos.length === 2) return [...twos]; // Nếu còn 2 heo, đánh luôn đôi heo
+                    else if (twos.length === 3) return [...twos]; // Nếu 3 heo, đánh sám heo
+                }
+            }
+        }
 
         // Nếu còn 2 bài → Kiểm tra có phải đôi không
         if (this.hand.length === 2 && combos.pairs.length > 0) {

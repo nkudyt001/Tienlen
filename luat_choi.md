@@ -80,6 +80,7 @@ Người chơi thắng ngay sau khi chia bài nếu sở hữu:
 - **Cóng (Cháy bài):** Người chơi chưa đánh ra được lá bài nào mà đã có người về Nhất. Người bị cóng sẽ bị phạt nặng (thường là gấp đôi hoặc gấp ba tiền cược + kiểm tra xem có thối heo/hàng không).
 - **Thối (Úng):** Khi ván bài kết thúc (có người về Nhì/Ba/Bét tùy luật), nếu người chơi còn giữ Heo hoặc các bộ đặc biệt (hàng) trên tay thì bị tính là thối và phải nộp thêm tiền phạt.
     - Phân loại phạt: Heo đen, Heo đỏ, Ba đôi thông, Tứ quý, Bốn đôi thông.
+- **Thối 2 (Đút mù):** Không được đánh quân 2 là bài cuối cùng để kết thúc tay. Nếu player/máy đánh quân 2 hoặc nhóm chứa quân 2 làm lượt cuối cùng để hết bài, người đó sẽ bị XỬ THUA thay vì về Nhất.
 - **Chặt chồng:** Người sau chặt lại người trước bằng bộ mạnh hơn. Người bị chặt cuối cùng sẽ phải trả toàn bộ tiền phạt tích lũy cho người thắng vòng đó.
 
 ---
