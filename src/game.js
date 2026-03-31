@@ -1,5 +1,6 @@
 import { Card } from './card.js';
 import { canBeat, classify, TYPE } from './logic.js';
+import { AIPlayer } from './ai.js';
 
 // Tạo Card object từ dữ liệu server
 function cardFromData(d) { return new Card(d.rankIndex, d.suitIndex); }
@@ -36,6 +37,7 @@ class GameClient {
         this.statusEl = document.getElementById('status-message');
         this.playBtn = document.getElementById('play-btn');
         this.passBtn = document.getElementById('pass-btn');
+        this.quickBtn = document.getElementById('quick-select-btn');
         this.winnerEl = document.getElementById('winner-message');
         this.mainTimer = document.getElementById('player-main-timer');
 
@@ -79,6 +81,7 @@ class GameClient {
                 this.readyBtn.innerText = 'Sẵn Sàng';
                 this.playBtn.classList.add('hidden');
                 this.passBtn.classList.add('hidden');
+                this.quickBtn.classList.add('hidden');
                 this.gameActions.classList.remove('hidden');
                 this.mainTimer.parentElement.classList.add('hidden');
                 this.stopLocalTimer();
@@ -117,6 +120,7 @@ class GameClient {
             this.gameActions.classList.remove('hidden');
             this.playBtn.classList.remove('hidden');
             this.passBtn.classList.remove('hidden');
+            this.quickBtn.classList.remove('hidden');
             this.statusEl.innerText = 'Chia bài xong!';
             this.renderPlayerHand();
         });
@@ -155,6 +159,7 @@ class GameClient {
             this.statusEl.innerText = `${data.playerName} bỏ lượt.`;
             if (data.players) this.players = data.players;
             this.renderRoomSlots();
+            this.showPassEffect(data.slotIdx);
         });
 
         this.socket.on('round-won', (data) => {
@@ -168,6 +173,7 @@ class GameClient {
             this.stopLocalTimer();
             this.playBtn.classList.add('hidden');
             this.passBtn.classList.add('hidden');
+            this.quickBtn.classList.add('hidden');
             this.mainTimer.parentElement.classList.add('hidden');
 
             if (this.winnerEl) {
@@ -244,10 +250,12 @@ class GameClient {
             this.readyBtn.classList.remove('hidden');
             this.playBtn.classList.add('hidden');
             this.passBtn.classList.add('hidden');
+            this.quickBtn.classList.add('hidden');
         };
         this.readyBtn.onclick = () => this.socket.emit('toggle-ready');
         this.playBtn.onclick = () => this.handlePlay();
         this.passBtn.onclick = () => this.socket.emit('pass');
+        this.quickBtn.onclick = () => this.handleQuickSelect();
     }
 
     // ==================== LOBBY ====================
@@ -285,6 +293,7 @@ class GameClient {
         this.readyBtn.innerText = 'Sẵn Sàng';
         this.playBtn.classList.add('hidden');
         this.passBtn.classList.add('hidden');
+        this.quickBtn.classList.add('hidden');
     }
 
     // ==================== RENDER ====================
@@ -363,17 +372,21 @@ class GameClient {
         if (this.gameState !== 'PLAYING') {
             this.playBtn.disabled = true;
             this.passBtn.disabled = true;
+            this.quickBtn.disabled = true;
             return;
         }
         const isMyTurn = this.currentTurn === this.mySlot;
         if (!isMyTurn) {
-            this.playBtn.disabled = true; this.passBtn.disabled = true; return;
+            this.playBtn.disabled = true; this.passBtn.disabled = true; this.quickBtn.disabled = true; return;
         }
 
         const selected = this.myHand.filter(c => this.selectedCardIds.has(c.id));
         const valid = canBeat(this.lastPlayedCards, selected);
         this.playBtn.disabled = !valid;
         this.passBtn.disabled = this.isFirstTurnOfTable || this.lastPlayerToPlay === -1;
+        
+        const quickCards = this.getQuickSelectCards();
+        this.quickBtn.disabled = !quickCards || quickCards.length === 0;
 
         // Hiển thị timer khi là lượt mình
         this.mainTimer.parentElement.classList.remove('hidden');
@@ -383,6 +396,81 @@ class GameClient {
         const selected = this.myHand.filter(c => this.selectedCardIds.has(c.id));
         if (!selected.length) return;
         this.socket.emit('play-cards', { cardIds: selected.map(c => c.id) });
+    }
+
+    getQuickSelectCards() {
+        if (this.gameState !== 'PLAYING' || this.currentTurn !== this.mySlot) return null;
+
+        const tempAi = new AIPlayer(this.mySlot, 'temp');
+        tempAi.hand = [...this.myHand];
+        
+        const lastPlayed = this.lastPlayedCards;
+        let selectedCards = null;
+
+        if (!lastPlayed || lastPlayed.length === 0) {
+            const combos = tempAi.analyzeHand();
+            // Lấy sảnh dài nhất, hoặc đôi nhỏ nhất, hoặc thẻ nhỏ nhất
+            if (combos.sequences.length > 0) {
+                selectedCards = combos.sequences.reduce((best, s) => s.length > best.length ? s : best);
+            } else if (combos.pairs.length > 0) {
+                const nonTwos = combos.pairs.filter(p => p[0].rankIndex !== 12);
+                selectedCards = nonTwos.length > 0 ? nonTwos[0] : combos.pairs[0];
+            } else {
+                const sorted = [...this.myHand].sort((a, b) => a.absoluteValue - b.absoluteValue);
+                const nonTwos = sorted.filter(c => c.rankIndex !== 12);
+                selectedCards = nonTwos.length > 0 ? [nonTwos[0]] : [sorted[0]];
+            }
+        } else {
+            const oldType = classify(lastPlayed);
+            switch(oldType.type) {
+                case TYPE.SINGLE: selectedCards = tempAi.findSingleBeat(lastPlayed, 13); break;
+                case TYPE.PAIR: selectedCards = tempAi.findPairBeat(lastPlayed, 13); break;
+                case TYPE.TRIPLE: selectedCards = tempAi.findTripleBeat(lastPlayed); break;
+                case TYPE.SEQUENCE: selectedCards = tempAi.findSequenceBeat(lastPlayed); break;
+                case TYPE.FOUR_QUADS: selectedCards = tempAi.findQuadBeat(lastPlayed); break;
+                case TYPE.THREE_PAIRS_LINK: {
+                    const combos = tempAi.analyzeHand();
+                    const validLinks = combos.threePairsLink.filter(l => canBeat(lastPlayed, l));
+                    if (validLinks.length > 0) selectedCards = validLinks[0];
+                    else {
+                        const validQuads = combos.quads.filter(q => canBeat(lastPlayed, q));
+                        if (validQuads.length > 0) selectedCards = validQuads[0];
+                    }
+                    break;
+                }
+                case TYPE.FOUR_PAIRS_LINK: {
+                    const combos = tempAi.analyzeHand();
+                    const validLinks = combos.fourPairsLink.filter(l => canBeat(lastPlayed, l));
+                    if (validLinks.length > 0) selectedCards = validLinks[0];
+                    break;
+                }
+            }
+
+            // Xử lý đè heo đặc biệt
+            if (!selectedCards && oldType.type === TYPE.SINGLE && lastPlayed[0].rankIndex === 12) {
+                const combos = tempAi.analyzeHand();
+                if (combos.threePairsLink.length > 0 && canBeat(lastPlayed, combos.threePairsLink[0])) selectedCards = combos.threePairsLink[0];
+                else if (combos.quads.length > 0 && canBeat(lastPlayed, combos.quads[0])) selectedCards = combos.quads[0];
+                else if (combos.fourPairsLink.length > 0 && canBeat(lastPlayed, combos.fourPairsLink[0])) selectedCards = combos.fourPairsLink[0];
+            }
+            if (!selectedCards && oldType.type === TYPE.PAIR && lastPlayed[0].rankIndex === 12) {
+                const combos = tempAi.analyzeHand();
+                if (combos.quads.length > 0 && canBeat(lastPlayed, combos.quads[0])) selectedCards = combos.quads[0];
+                else if (combos.fourPairsLink.length > 0 && canBeat(lastPlayed, combos.fourPairsLink[0])) selectedCards = combos.fourPairsLink[0];
+            }
+        }
+
+        return selectedCards;
+    }
+
+    handleQuickSelect() {
+        const selectedCards = this.getQuickSelectCards();
+        if (selectedCards && selectedCards.length > 0) {
+            this.selectedCardIds.clear();
+            selectedCards.forEach(c => this.selectedCardIds.add(c.id));
+            this.renderPlayerHand();
+            this.updateControls();
+        }
     }
 
     // ==================== ANIMATIONS ====================
@@ -487,7 +575,7 @@ class GameClient {
                     pairGroup.className = 'pair-group';
                     for (let j = i; j < i + 2 && j < sorted.length; j++) {
                         const el = sorted[j].render();
-                        el.style.marginLeft = j === i ? '0' : '-40px';
+                        // Để css lo việc đè bài
                         pairGroup.appendChild(el);
                     }
                     this.boardEl.appendChild(pairGroup);
@@ -496,20 +584,41 @@ class GameClient {
                 // Sảnh: xếp ngang gọn gàng, overlap vừa phải
                 sorted.forEach((card, i) => {
                     const el = card.render();
-                    el.style.marginLeft = i === 0 ? '0' : '-50px';
                     this.boardEl.appendChild(el);
                 });
             } else {
                 // Rác, đôi, sám, tứ quý: giữ nguyên kiểu cũ
                 cards.forEach((card, i) => {
                     const el = card.render();
-                    el.style.marginLeft = i === 0 ? '0' : '-30px';
                     el.style.transform = `rotate(${Math.random() * 10 - 5}deg)`;
                     this.boardEl.appendChild(el);
                 });
             }
             this.renderRoomSlots();
         });
+    }
+
+    showPassEffect(serverSlot) {
+        const displayIdx = this.serverToDisplay(serverSlot);
+        const slotEl = document.getElementById(this.displayDomId(displayIdx));
+        if (!slotEl) return;
+
+        const passTag = document.createElement('div');
+        passTag.className = 'pass-effect-tag';
+        passTag.innerText = 'Bỏ lượt';
+        
+        // Chỉnh chút vị trí nếu là bản thân để tránh che tay bài
+        if (displayIdx === 0) {
+            passTag.style.top = '-40px';
+        }
+        
+        slotEl.appendChild(passTag);
+
+        setTimeout(() => {
+            if (passTag.parentElement) {
+                passTag.parentElement.removeChild(passTag);
+            }
+        }, 2000);
     }
 
     // ==================== TIMER ====================
