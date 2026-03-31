@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiến Lên Miền Nam - Multiplayer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Dialog nhập tên -->
+    <div id="name-dialog" class="modal-overlay">
+        <div class="modal-content">
+            <h2>🃏 Tiến Lên Miền Nam</h2>
+            <p>Nhập tên của bạn:</p>
+            <input type="text" id="player-name-input" placeholder="Tên người chơi..." maxlength="12"
+                   style="width:100%;padding:12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass-bg);color:#fff;font-size:1rem;font-family:inherit;margin:10px 0;">
+            <div class="modal-actions">
+                <button id="name-confirm-btn" class="btn primary">Vào Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sảnh chờ (Lobby) -->
+    <div id="lobby-screen" class="screen hidden">
+        <header class="lobby-header">
+            <div class="logo">SẢNH CHỜ TIẾN LÊN</div>
+            <div class="user-info" id="user-greeting">CHÀO BẠN!</div>
+        </header>
+        <div class="table-grid" id="table-grid"></div>
+    </div>
+
+    <!-- Màn hình Game -->
+    <div id="game-container" class="screen hidden">
+        <header class="game-header">
+            <button id="leave-room-btn" class="btn secondary">Rời Bàn</button>
+            <div class="logo">BÀN SỐ <span id="room-id-display">1</span></div>
+            <div class="game-info">
+                <div id="status-message">Đang chờ người chơi...</div>
+            </div>
+            <div class="settings"></div>
+        </header>
+
+        <main class="table-area">
+            <div class="player-slot opponent top" id="slot-2">
+                <div class="slot-content empty"><span>Trống</span></div>
+            </div>
+            <div class="player-slot opponent left" id="slot-3">
+                <div class="slot-content empty"><span>Trống</span></div>
+            </div>
+            <div class="player-slot opponent right" id="slot-1">
+                <div class="slot-content empty"><span>Trống</span></div>
+            </div>
+
+            <div id="board" class="board">
+                <div id="start-countdown" class="start-countdown hidden">3</div>
+                <div id="last-played-cards" class="played-cards-area"></div>
+                <button id="enter-table-btn" class="btn success center-btn hidden">VÀO BÀN</button>
+            </div>
+
+            <div class="player-controls hidden" id="game-actions">
+                <div class="timer-container player-side-timer">
+                    <div id="player-main-timer" class="timer-circle-small">30</div>
+                </div>
+                <div class="action-buttons">
+                    <button id="ready-btn" class="btn primary">Sẵn Sàng</button>
+                    <button id="pass-btn" class="btn secondary" disabled>Bỏ Lượt</button>
+                    <button id="play-btn" class="btn success" disabled>Đánh Bài</button>
+                </div>
+            </div>
+            <!-- Thông báo thắng (ngoài board để căn giữa màn hình) -->
+            <div id="winner-message" class="winner-message hidden">XIN CHÚC MỪNG!</div>
+        </main>
+
+        <footer class="player-area">
+            <div class="hand-container" id="player-hand"></div>
+            <div class="player-identity" id="slot-0">
+                <div class="avatar">👤</div>
+                <div class="info">
+                    <span class="name">Bạn</span>
+                    <span class="ready-tag">Sẵn sàng</span>
+                    <div class="player-timer hidden" id="timer-0">30</div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal kết quả -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 id="modal-title">Kết quả</h2>
+            <p id="modal-body"></p>
+            <div class="modal-actions">
+                <button id="modal-continue" class="btn primary">Tiếp tục</button>
+                <button id="modal-leave" class="btn secondary">Rời bàn</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="src/game.js"></script>
+</body>
+</html>

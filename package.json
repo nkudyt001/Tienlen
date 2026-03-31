@@ -1,0 +1,18 @@
+{
+  "name": "tien-len-mien-nam",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Game bài Tiến Lên Miền Nam - Multiplayer LAN",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io": "^4.7.5"
+  }
+}
